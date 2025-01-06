@@ -152,8 +152,8 @@ void Pipeline::VisualizeResults(std::vector<std::string> rec_text,
   char text[255];
   cv::Scalar color = cv::Scalar(255, 255, 255);
   int font_face = cv::FONT_HERSHEY_PLAIN;
-  double font_scale = 1.f;
-  float thickness = 1;
+  double font_scale = 2.f;
+  float thickness = 2;
   sprintf(text, "OCR results");
   cv::Size text_size =
       cv::getTextSize(text, font_face, font_scale, thickness, nullptr);
