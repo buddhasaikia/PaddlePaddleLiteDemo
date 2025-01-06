@@ -2,6 +2,7 @@ package com.baidu.paddle.lite.demo.ppocr_demo;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class RecTextResultProcessor {
     private final RecTextResult recTextResult;
@@ -24,6 +25,17 @@ public class RecTextResultProcessor {
             return processedRecTextResultMap;
         }
 
+        public Map<String, Float> ignoreTextAndGetResultAsMap() {
+            Map<String, Float> filteredResults = new HashMap<>();
+            Set<Map.Entry<String, Float>> entrySet = processedRecTextResultMap.entrySet();
+            for (Map.Entry<String, Float> entry : entrySet) {
+                if (!isNumeric(entry.getKey())) {
+                    filteredResults.put(entry.getKey(), entry.getValue());
+                }
+            }
+            return filteredResults;
+        }
+
         private Builder toMap() {
             Map<String, Float> map = new HashMap<>();
             for (int i = 0; i < recTextResult.getRecText().size(); i++) {
@@ -34,16 +46,29 @@ public class RecTextResultProcessor {
         }
 
         public Builder process(float accuracyThreshold) {
-            toMap().recTextResultMap.forEach((k, v) -> {
-                if (v > accuracyThreshold) {
-                    processedRecTextResultMap.put(k, v);
+            Set<Map.Entry<String, Float>> entrySet = toMap().recTextResultMap.entrySet();
+            for (Map.Entry<String, Float> entry : entrySet) {
+                if (entry.getValue() > accuracyThreshold) {
+                    processedRecTextResultMap.put(entry.getKey(), entry.getValue());
                 }
-            });
+            }
             return this;
         }
 
         public RecTextResultProcessor build() {
             return new RecTextResultProcessor(this);
+        }
+    }
+
+    public static boolean isNumeric(String str) {
+        if (str == null || str.isEmpty()) {
+            return false;
+        }
+        try {
+            Double.parseDouble(str);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
         }
     }
 }

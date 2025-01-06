@@ -22,6 +22,7 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -206,7 +207,10 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
                         .getResultAsMap();
                 if (!processedResult.isEmpty()) {
                     Log.d("RecTextResultProcessor", "====================Scan #"+(scanCount++)+"=============================");
-                    processedResult.forEach((k, v) -> Log.d("RecTextResultProcessor", k +" = "+v));
+                    Set<Map.Entry<String, Float>> entrySet = processedResult.entrySet();
+                    for (Map.Entry<String, Float> entry : entrySet) {
+                        Log.d("RecTextResultProcessor", entry.getKey() +" = "+entry.getValue());
+                    }
                 }
             }
         }
