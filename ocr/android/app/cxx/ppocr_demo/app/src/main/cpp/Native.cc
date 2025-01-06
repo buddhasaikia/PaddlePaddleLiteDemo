@@ -48,9 +48,7 @@ Java_com_baidu_paddle_lite_demo_ppocr_1demo_Native_nativeInit(
  * Signature: (J)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_com_baidu_paddle_lite_demo_ppocr_1demo_Native_nativeRelease(JNIEnv *env,
-                                                                 jclass thiz,
-                                                                 jlong ctx) {
+Java_com_baidu_paddle_lite_demo_ppocr_1demo_Native_nativeRelease(JNIEnv *env,jclass thiz,jlong ctx) {
   if (ctx == 0) {
     return JNI_FALSE;
   }
@@ -64,7 +62,7 @@ Java_com_baidu_paddle_lite_demo_ppocr_1demo_Native_nativeRelease(JNIEnv *env,
  * Method:    nativeProcess
  * Signature: (JIIIILjava/lang/String;)Z
  */
-JNIEXPORT jboolean JNICALL
+/*JNIEXPORT jboolean JNICALL
 Java_com_baidu_paddle_lite_demo_ppocr_1demo_Native_nativeProcess(
     JNIEnv *env, jclass thiz, jlong ctx, jint inTextureId, jint outTextureId,
     jint textureWidth, jint textureHeight, jstring jsavedImagePath) {
@@ -75,6 +73,57 @@ Java_com_baidu_paddle_lite_demo_ppocr_1demo_Native_nativeProcess(
   Pipeline *pipeline = reinterpret_cast<Pipeline *>(ctx);
   return pipeline->Process_val(inTextureId, outTextureId, textureWidth,
                                textureHeight, savedImagePath);
+}*/
+
+// JNI Function
+JNIEXPORT jobject JNICALL
+Java_com_baidu_paddle_lite_demo_ppocr_1demo_Native_nativeProcess(
+        JNIEnv *env, jclass thiz, jlong ctx, jint inTextureId, jint outTextureId,
+        jint textureWidth, jint textureHeight, jstring jsavedImagePath) {
+
+    if (ctx == 0) {
+        return nullptr; // Return nullptr if context is invalid
+    }
+
+    std::string savedImagePath = jstring_to_cpp_string(env, jsavedImagePath);
+    Pipeline *pipeline = reinterpret_cast<Pipeline *>(ctx);
+
+    auto result = pipeline->Process_val(inTextureId, outTextureId, textureWidth,
+                                        textureHeight, savedImagePath);
+
+    // Create a Java object to hold the results
+    jclass resultClass = env->FindClass("com/baidu/paddle/lite/demo/ppocr_demo/RecTextResult");
+    if (resultClass == nullptr) {
+        return nullptr; // Handle class not found
+    }
+
+    // Get the constructor of the RecTextResult class
+    jmethodID constructor = env->GetMethodID(resultClass, "<init>", "(Ljava/util/List;Ljava/util/List;)V");
+    if (constructor == nullptr) {
+        return nullptr; // Handle constructor not found
+    }
+
+    // Convert std::vector<std::string> to Java List
+    jclass stringClass = env->FindClass("java/lang/String");
+    jmethodID listConstructor = env->GetMethodID(env->FindClass("java/util/ArrayList"), "<init>", "()V");
+    jmethodID listAdd = env->GetMethodID(env->FindClass("java/util/List"), "add", "(Ljava/lang/Object;)Z");
+
+    jobject recTextList = env->NewObject(env->FindClass("java/util/ArrayList"), listConstructor);
+    for (const auto& text : result.first) {
+        jobject jText = env->NewStringUTF(text.c_str());
+        env->CallBooleanMethod(recTextList, listAdd, jText);
+    }
+
+    jobject recTextScoreList = env->NewObject(env->FindClass("java/util/ArrayList"), listConstructor);
+    for (const auto& score : result.second) {
+        jobject jScore = env->NewObject(env->FindClass("java/lang/Float"), env->GetMethodID(env->FindClass("java/lang/Float"), "<init>", "(F)V"), score);
+        env->CallBooleanMethod(recTextScoreList, listAdd, jScore);
+    }
+
+    // Create an instance of RecTextResult
+    jobject recTextResult = env->NewObject(resultClass, constructor, recTextList, recTextScoreList);
+
+    return recTextResult; // Return the results
 }
 
 #ifdef __cplusplus

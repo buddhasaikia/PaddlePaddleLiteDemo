@@ -182,8 +182,8 @@ void Pipeline::VisualizeStatus(double readGLFBOTime, double writeGLTextureTime,
   char text[255];
   cv::Scalar color = cv::Scalar(255, 255, 255);
   int font_face = cv::FONT_HERSHEY_PLAIN;
-  double font_scale = 1.f;
-  float thickness = 1;
+  double font_scale = 2.f;
+  float thickness = 2;
   sprintf(text, "Read GLFBO time: %.1f ms", readGLFBOTime);
   cv::Size text_size =
       cv::getTextSize(text, font_face, font_scale, thickness, nullptr);
@@ -233,7 +233,7 @@ Pipeline::Pipeline(const std::string &detModelDir,
   charactor_dict_.push_back(" ");
 }
 
-bool Pipeline::Process_val(int inTextureId, int outTextureId, int textureWidth,
+std::pair<std::vector<std::string>, std::vector<float>> Pipeline::Process_val(int inTextureId, int outTextureId, int textureWidth,
                            int textureHeight, std::string savedImagePath) {
   double readGLFBOTime = 0, writeGLTextureTime = 0;
   double visualizeResultsTime = 0, predictTime = 0;
@@ -291,5 +291,6 @@ bool Pipeline::Process_val(int inTextureId, int outTextureId, int textureWidth,
                   rec_text_score, visualizeResultsTime, &img_vis);
 
   WriteRGBAImageBackToGLTexture(img_vis, outTextureId, &writeGLTextureTime);
-  return true;
+  //return true;
+  return {rec_text, rec_text_score};
 }

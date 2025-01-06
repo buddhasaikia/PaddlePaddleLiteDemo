@@ -34,8 +34,8 @@ public:
            const int cPUThreadNum, const std::string &config_path,
            const std::string &dict_path);
 
-  bool Process_val(int inTextureId, int outTextureId, int textureWidth,
-                   int textureHeight, std::string savedImagePath);
+  std::pair<std::vector<std::string>, std::vector<float>> Process_val(int inTextureId, int outTextureId, int textureWidth,
+              int textureHeight, std::string savedImagePath);
 
 private:
   // Read pixels from FBO texture to CV image

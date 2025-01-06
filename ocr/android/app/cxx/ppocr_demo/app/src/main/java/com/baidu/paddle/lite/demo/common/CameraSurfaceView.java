@@ -10,17 +10,23 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.GLSurfaceView.Renderer;
 import android.opengl.Matrix;
+import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.Pair;
 
-import javax.microedition.khronos.egl.EGLConfig;
-import javax.microedition.khronos.opengles.GL10;
+import com.baidu.paddle.lite.demo.ppocr_demo.RecTextResult;
+import com.baidu.paddle.lite.demo.ppocr_demo.RecTextResultProcessor;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.List;
+import java.util.Map;
+
+import javax.microedition.khronos.egl.EGLConfig;
+import javax.microedition.khronos.opengles.GL10;
 
 public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         SurfaceTexture.OnFrameAvailableListener {
@@ -94,7 +100,7 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     private int tcTex2Screen;
 
     public interface OnTextureChangedListener {
-        public boolean onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight);
+        public RecTextResult onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight);
     }
 
     private OnTextureChangedListener onTextureChangedListener = null;
@@ -191,9 +197,13 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         // Check if the draw texture is set
         int targetTexureId = fboTexureId[0];
         if (onTextureChangedListener != null) {
-            boolean modified = onTextureChangedListener.onTextureChanged(fboTexureId[0], drawTexureId[0],
+            RecTextResult modified = onTextureChangedListener.onTextureChanged(fboTexureId[0], drawTexureId[0],
                     textureWidth, textureHeight);
-            if (modified) {
+            if (modified.getRecText() != null && modified.getRecTextScore() != null) {
+                RecTextResultProcessor.Builder builder = new RecTextResultProcessor.Builder().setRecTextResult(modified).toMap(modified).process();
+                Map<String, Float> processedResult = builder.getRecTextResultMap();
+                processedResult.forEach((k, v) -> Log.d("RecTextResultProcessor", k +" = "+v));
+                Log.d("RecTextResultProcessor", "=================================================");
                 targetTexureId = drawTexureId[0];
             }
         }

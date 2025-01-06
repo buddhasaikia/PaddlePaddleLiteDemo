@@ -11,6 +11,7 @@ import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.util.Pair;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -24,6 +25,7 @@ import com.baidu.paddle.lite.demo.common.Utils;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 
 
 public class MainActivity extends Activity implements View.OnClickListener, CameraSurfaceView.OnTextureChangedListener {
@@ -87,13 +89,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
     }
 
     @Override
-    public boolean onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight) {
+    public RecTextResult onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight) {
         String savedImagePath = "";
         synchronized (this) {
             savedImagePath = MainActivity.this.savedImagePath;
         }
         savedImagePath = Utils.getDCIMDirectory() + File.separator + "result.jpg";
-        boolean modified = predictor.process(inTextureId, outTextureId, textureWidth, textureHeight, savedImagePath);
+        RecTextResult modified = predictor.process(inTextureId, outTextureId, textureWidth, textureHeight, savedImagePath);
         if (!savedImagePath.isEmpty()) {
             synchronized (this) {
                 MainActivity.this.savedImagePath = "";

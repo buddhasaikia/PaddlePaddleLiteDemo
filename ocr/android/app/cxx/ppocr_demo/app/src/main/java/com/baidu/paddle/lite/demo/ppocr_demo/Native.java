@@ -1,10 +1,10 @@
 package com.baidu.paddle.lite.demo.ppocr_demo;
 
 import android.content.Context;
-import android.util.Log;
+import android.util.Pair;
 
-import com.baidu.paddle.lite.demo.common.SDKExceptions;
-import com.baidu.paddle.lite.demo.common.Utils;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Native {
     static {
@@ -12,7 +12,7 @@ public class Native {
     }
 
     private long ctx = 0;
-    private boolean run_status = false;
+    private RecTextResult run_status = null;
 
     public boolean init(Context mContext,
                         String detModelPath,
@@ -40,9 +40,9 @@ public class Native {
         return nativeRelease(ctx);
     }
 
-    public boolean process(int inTextureId, int outTextureId, int textureWidth, int textureHeight, String savedImagePath) {
+    public RecTextResult process(int inTextureId, int outTextureId, int textureWidth, int textureHeight, String savedImagePath) {
         if (ctx == 0) {
-            return false;
+            return new RecTextResult();
         }
         run_status = nativeProcess(ctx, inTextureId, outTextureId, textureWidth, textureHeight, savedImagePath);
         return run_status;
@@ -59,5 +59,5 @@ public class Native {
 
     public static native boolean nativeRelease(long ctx);
 
-    public static native boolean nativeProcess(long ctx, int inTextureId, int outTextureId, int textureWidth, int textureHeight, String savedImagePath);
+    public static native RecTextResult nativeProcess(long ctx, int inTextureId, int outTextureId, int textureWidth, int textureHeight, String savedImagePath);
 }
