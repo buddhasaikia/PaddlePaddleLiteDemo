@@ -10,25 +10,21 @@ public class RecTextResultProcessor {
         this.recTextResult = builder.build().recTextResult;
     }
 
-    public RecTextResult getRecTextResult() {
-        return recTextResult;
-    }
-
     public static class Builder {
         private RecTextResult recTextResult;
         private Map<String, Float> recTextResultMap = new HashMap<>();
-        private Map<String, Float> processedRecTextResultMap = new HashMap<>();
+        private final Map<String, Float> processedRecTextResultMap = new HashMap<>();
 
         public Builder setRecTextResult(RecTextResult recTextResult) {
             this.recTextResult = recTextResult;
             return this;
         }
 
-        public Map<String, Float> getRecTextResultMap() {
-            return recTextResultMap;
+        public Map<String, Float> getResultAsMap() {
+            return processedRecTextResultMap;
         }
 
-        public Builder toMap(RecTextResult recTextResult) {
+        private Builder toMap() {
             Map<String, Float> map = new HashMap<>();
             for (int i = 0; i < recTextResult.getRecText().size(); i++) {
                 map.put(recTextResult.getRecText().get(i), recTextResult.getRecTextScore().get(i));
@@ -37,9 +33,9 @@ public class RecTextResultProcessor {
             return this;
         }
 
-        public Builder process() {
-            recTextResultMap.forEach((k, v) -> {
-                if (v > 0.5) {
+        public Builder process(float accuracyThreshold) {
+            toMap().recTextResultMap.forEach((k, v) -> {
+                if (v > accuracyThreshold) {
                     processedRecTextResultMap.put(k, v);
                 }
             });

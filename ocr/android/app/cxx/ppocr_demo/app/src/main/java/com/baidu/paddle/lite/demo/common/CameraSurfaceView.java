@@ -10,10 +10,8 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.GLSurfaceView.Renderer;
 import android.opengl.Matrix;
-import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.util.Pair;
 
 import com.baidu.paddle.lite.demo.ppocr_demo.RecTextResult;
 import com.baidu.paddle.lite.demo.ppocr_demo.RecTextResultProcessor;
@@ -98,6 +96,7 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     private int tcCam2FBO;
     private int vcTex2Screen;
     private int tcTex2Screen;
+    private int scanCount = 0;
 
     public interface OnTextureChangedListener {
         public RecTextResult onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight);
@@ -197,14 +196,18 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         // Check if the draw texture is set
         int targetTexureId = fboTexureId[0];
         if (onTextureChangedListener != null) {
-            RecTextResult modified = onTextureChangedListener.onTextureChanged(fboTexureId[0], drawTexureId[0],
+            RecTextResult recTextResult = onTextureChangedListener.onTextureChanged(fboTexureId[0], drawTexureId[0],
                     textureWidth, textureHeight);
-            if (modified.getRecText() != null && modified.getRecTextScore() != null) {
-                RecTextResultProcessor.Builder builder = new RecTextResultProcessor.Builder().setRecTextResult(modified).toMap(modified).process();
-                Map<String, Float> processedResult = builder.getRecTextResultMap();
-                processedResult.forEach((k, v) -> Log.d("RecTextResultProcessor", k +" = "+v));
-                Log.d("RecTextResultProcessor", "=================================================");
+            if (recTextResult.getRecText() != null && recTextResult.getRecTextScore() != null) {
                 targetTexureId = drawTexureId[0];
+                RecTextResultProcessor.Builder builder = new RecTextResultProcessor.Builder();
+                Map<String, Float> processedResult = builder.setRecTextResult(recTextResult)
+                        .process(0.9f)
+                        .getResultAsMap();
+                if (!processedResult.isEmpty()) {
+                    Log.d("RecTextResultProcessor", "====================Scan #"+(scanCount++)+"=============================");
+                    processedResult.forEach((k, v) -> Log.d("RecTextResultProcessor", k +" = "+v));
+                }
             }
         }
 
