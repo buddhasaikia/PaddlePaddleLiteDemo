@@ -394,6 +394,9 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         if (parameters.getSupportedFocusModes().contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
             parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
         }
+        int maxZoom = parameters.getMaxZoom();
+        System.out.println("buddha maxZoom: " + maxZoom);
+        parameters.setZoom(maxZoom / 2);
         camera.setParameters(parameters);
         int degree = Utils.getCameraDisplayOrientation(context, selectedCameraId);
         camera.setDisplayOrientation(degree);
