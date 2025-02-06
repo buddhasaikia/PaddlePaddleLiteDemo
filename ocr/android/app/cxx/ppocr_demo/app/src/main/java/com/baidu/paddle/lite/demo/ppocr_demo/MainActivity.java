@@ -81,7 +81,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
             case R.id.btn_shutter:
                 SimpleDateFormat date = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss");
                 synchronized (this) {
-                    savedImagePath = Utils.getDCIMDirectory() + File.separator + date.format(new Date()).toString() + ".png";
+                    savedImagePath = Utils.getDCIMDirectory() + File.separator + date.format(new Date()) + ".png";
                 }
                 Toast.makeText(MainActivity.this, "Save snapshot to " + savedImagePath, Toast.LENGTH_SHORT).show();
                 break;
@@ -106,7 +106,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
             final int fps = (int) (lastFrameIndex * 1e9 / (System.nanoTime() - lastFrameTime));
             runOnUiThread(new Runnable() {
                 public void run() {
-                    tvStatus.setText(Integer.toString(fps) + "fps");
+                    tvStatus.setText(fps + "fps");
                 }
             });
             lastFrameIndex = 0;
@@ -142,12 +142,12 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
     }
 
     public void initView() {
-        svPreview = (CameraSurfaceView) findViewById(R.id.sv_preview);
+        svPreview = findViewById(R.id.sv_preview);
         svPreview.setOnTextureChangedListener(this);
-        tvStatus = (TextView) findViewById(R.id.tv_status);
-        btnSwitch = (ImageButton) findViewById(R.id.btn_switch);
+        tvStatus = findViewById(R.id.tv_status);
+        btnSwitch = findViewById(R.id.btn_switch);
         btnSwitch.setOnClickListener(this);
-        btnShutter = (ImageButton) findViewById(R.id.btn_shutter);
+        btnShutter = findViewById(R.id.btn_shutter);
         btnShutter.setOnClickListener(this);
     }
 

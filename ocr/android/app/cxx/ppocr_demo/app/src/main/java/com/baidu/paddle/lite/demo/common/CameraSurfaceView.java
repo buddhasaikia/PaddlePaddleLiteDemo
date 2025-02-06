@@ -41,7 +41,7 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     private float rectTop = 0.2f;
     private float rectBottom = 0.8f;
     private int rectangleColor = Color.GREEN;
-    private float rectangleBorderWidth = 0.01f;
+    private final float rectangleBorderWidth = 0.01f;
 
     protected int numberOfCameras;
     protected int selectedCameraId;
@@ -63,8 +63,7 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     protected int[] fboTexureId = {0};
     protected int[] drawTexureId = {0};
 
-    private final String vss = ""
-            + "attribute vec2 vPosition;\n"
+    private final String vss = "attribute vec2 vPosition;\n"
             + "attribute vec2 vTexCoord;\n"
             + "varying vec2 texCoord;\n"
             + "void main() {\n"
@@ -72,8 +71,7 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
             + "  gl_Position = vec4 (vPosition.x, vPosition.y, 0.0, 1.0);\n"
             + "}";
 
-    private final String fssCam2FBO = ""
-            + "#extension GL_OES_EGL_image_external : require\n"
+    private final String fssCam2FBO = "#extension GL_OES_EGL_image_external : require\n"
             + "precision mediump float;\n"
             + "uniform samplerExternalOES sTexture;\n"
             + "varying vec2 texCoord;\n"
@@ -87,8 +85,7 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
             + "  }\n"
             + "}";
 
-    private final String fssTex2Screen = ""
-            + "precision mediump float;\n"
+    private final String fssTex2Screen = "precision mediump float;\n"
             + "uniform sampler2D sTexture;\n"
             + "varying vec2 texCoord;\n"
             + "void main() {\n"
@@ -96,14 +93,12 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
             + "}";
 
     // New shader for rectangle overlay
-    private final String vssOverlay = ""
-            + "attribute vec2 vPosition;\n"
+    private final String vssOverlay = "attribute vec2 vPosition;\n"
             + "void main() {\n"
             + "  gl_Position = vec4(vPosition.x, vPosition.y, 0.0, 1.0);\n"
             + "}";
 
-    private final String fssOverlay = ""
-            + "precision mediump float;\n"
+    private final String fssOverlay = "precision mediump float;\n"
             + "uniform vec4 uColor;\n"
             + "void main() {\n"
             + "  gl_FragColor = uColor;\n"
@@ -111,12 +106,12 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
 
 
 
-    private final float vertexCoords[] = {
+    private final float[] vertexCoords = {
             -1, -1,
             -1, 1,
             1, -1,
             1, 1};
-    private float textureCoords[] = {
+    private final float[] textureCoords = {
             0, 1,
             0, 0,
             1, 1,
@@ -139,7 +134,7 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     private int scanCount = 0;
 
     public interface OnTextureChangedListener {
-        public RecTextResult onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight);
+        RecTextResult onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight);
     }
 
     private OnTextureChangedListener onTextureChangedListener = null;
@@ -240,7 +235,7 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         surfaceTexture.updateTexImage();
-        float matrix[] = new float[16];
+        float[] matrix = new float[16];
         surfaceTexture.getTransformMatrix(matrix);
 
         // Draw to FBO with rectangle cropping
