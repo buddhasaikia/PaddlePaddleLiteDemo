@@ -36,8 +36,8 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     public static final int EXPECTED_PREVIEW_WIDTH = 1280;
     public static final int EXPECTED_PREVIEW_HEIGHT = 720;
 
-    private float rectLeft = 0.3f;
-    private float rectRight = 0.7f;
+    private float rectLeft = 0.2f;
+    private float rectRight = 0.8f;
     private float rectTop = 0.2f;
     private float rectBottom = 0.8f;
     private int rectangleColor = Color.GREEN;
