@@ -11,7 +11,7 @@
         android:layout_height="match_parent"
         android:background="@color/colorWindow">
 
-        <com.baidu.paddle.lite.demo.common.CameraSurfaceView
+        <com.baidu.paddle.lite.demo.common.camera2usingopengl.CameraSurfaceView
             android:id="@+id/sv_preview"
             android:layout_width="match_parent"
             android:layout_height="match_parent"

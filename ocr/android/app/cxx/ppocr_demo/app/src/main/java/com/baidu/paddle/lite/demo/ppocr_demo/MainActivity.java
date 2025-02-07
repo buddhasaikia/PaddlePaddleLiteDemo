@@ -3,28 +3,28 @@ package com.baidu.paddle.lite.demo.ppocr_demo;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
-import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.baidu.paddle.lite.demo.common.CameraSurfaceView;
 import com.baidu.paddle.lite.demo.common.Utils;
+import com.baidu.paddle.lite.demo.common.camera2usingopengl.CameraSurfaceView;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 
 
-public class MainActivity extends Activity implements View.OnClickListener, CameraSurfaceView.OnTextureChangedListener {
+public class MainActivity extends Activity implements CameraSurfaceView.OnTextureChangedListener {
     CameraSurfaceView svPreview;
     TextView tvStatus;
     ImageButton btnSwitch;
@@ -67,22 +67,6 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
     }
 
     @Override
-    public void onClick(View v) {
-        switch (v.getId()) {
-            case R.id.btn_switch:
-                svPreview.switchCamera();
-                break;
-            case R.id.btn_shutter:
-                SimpleDateFormat date = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss");
-                synchronized (this) {
-                    savedImagePath = Utils.getDCIMDirectory() + File.separator + date.format(new Date()) + ".png";
-                }
-                Toast.makeText(MainActivity.this, "Save snapshot to " + savedImagePath, Toast.LENGTH_SHORT).show();
-                break;
-        }
-    }
-
-    @Override
     public RecTextResult onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight) {
         String savedImagePath = "";
         synchronized (this) {
@@ -98,10 +82,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
         lastFrameIndex++;
         if (lastFrameIndex >= 30) {
             final int fps = (int) (lastFrameIndex * 1e9 / (System.nanoTime() - lastFrameTime));
-            runOnUiThread(new Runnable() {
-                public void run() {
-                    tvStatus.setText(fps + "fps");
-                }
+            runOnUiThread(() -> {
+                final String formattedFps = fps + "fps";
+                tvStatus.setText(formattedFps);
             });
             lastFrameIndex = 0;
             lastFrameTime = System.nanoTime();
@@ -112,19 +95,20 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
     @Override
     protected void onResume() {
         super.onResume();
-        // Reload settings and re-initialize the predictor
         checkRun();
+        /*// Reload settings and re-initialize the predictor
         // Open camera until the permissions have been granted
         if (!checkAllPermissions()) {
             svPreview.disableCamera();
         }
+        svPreview.onResume();*/
         svPreview.onResume();
     }
 
     @Override
     protected void onPause() {
-        super.onPause();
         svPreview.onPause();
+        super.onPause();
     }
 
     @Override
@@ -137,12 +121,24 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
 
     public void initView() {
         svPreview = findViewById(R.id.sv_preview);
+
+        // Set rectangle bounds (30% left, 20% top, 70% right, 80% bottom)
+        //svPreview.setRectangleBounds(0.3f, 0.2f, 0.7f, 0.8f);
+        // Optional: Change rectangle color
+        //svPreview.setRectangleColor(Color.RED);  // Change to red
+
         svPreview.setOnTextureChangedListener(this);
         tvStatus = findViewById(R.id.tv_status);
         btnSwitch = findViewById(R.id.btn_switch);
-        btnSwitch.setOnClickListener(this);
+        btnSwitch.setOnClickListener(v -> svPreview.switchCamera());
         btnShutter = findViewById(R.id.btn_shutter);
-        btnShutter.setOnClickListener(this);
+        btnShutter.setOnClickListener(v -> {
+            SimpleDateFormat date = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.getDefault());
+            synchronized (this) {
+                savedImagePath = Utils.getDCIMDirectory() + File.separator + date.format(new Date()) + ".png";
+            }
+            Toast.makeText(MainActivity.this, "Save snapshot to " + savedImagePath, Toast.LENGTH_SHORT).show();
+        });
     }
 
     public void checkRun() {
@@ -196,12 +192,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
                     .setMessage("Click to force quit the app, then open Settings->Apps & notifications->Target " +
                             "App->Permissions to grant all of the permissions.")
                     .setCancelable(false)
-                    .setPositiveButton("Exit", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            MainActivity.this.finish();
-                        }
-                    }).show();
+                    .setPositiveButton("Exit", (dialog, which) -> MainActivity.this.finish()).show();
         }
     }
 
