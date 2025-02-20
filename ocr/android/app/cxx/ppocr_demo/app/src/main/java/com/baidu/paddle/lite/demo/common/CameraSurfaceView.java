@@ -47,6 +47,8 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     protected int textureWidth = 0;
     protected int textureHeight = 0;
 
+    private int processingMode = 0; // Default: Normal (0 = Normal, 1 = Grayscale, 2 = Edge, 3 = Threshold, 4 = Blur)
+
     // In order to manipulate the camera preview data and render the modified one
     // to the screen, three textures are created and the data flow is shown as following:
     // previewdata->camTextureId->fboTexureId->drawTexureId->framebuffer
@@ -67,8 +69,65 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
             + "precision mediump float;\n"
             + "uniform samplerExternalOES sTexture;\n"
             + "varying vec2 texCoord;\n"
+            + "uniform int mode;\n"  // Mode selector
+
+            // Edge Detection (Sobel)
+            + "vec3 applySobel(samplerExternalOES tex, vec2 uv) {\n"
+            + "    float offset = 1.0 / 512.0;\n"
+            + "    vec3 sample0 = texture2D(tex, uv + vec2(-offset, -offset)).rgb;\n"
+            + "    vec3 sample1 = texture2D(tex, uv + vec2( 0.0, -offset)).rgb;\n"
+            + "    vec3 sample2 = texture2D(tex, uv + vec2( offset, -offset)).rgb;\n"
+            + "    vec3 sample3 = texture2D(tex, uv + vec2(-offset,  0.0)).rgb;\n"
+            + "    vec3 sample4 = texture2D(tex, uv).rgb;\n"
+            + "    vec3 sample5 = texture2D(tex, uv + vec2( offset,  0.0)).rgb;\n"
+            + "    vec3 sample6 = texture2D(tex, uv + vec2(-offset,  offset)).rgb;\n"
+            + "    vec3 sample7 = texture2D(tex, uv + vec2( 0.0,  offset)).rgb;\n"
+            + "    vec3 sample8 = texture2D(tex, uv + vec2( offset,  offset)).rgb;\n"
+            + "    vec3 gx = -sample0 - 2.0 * sample3 - sample6 + sample2 + 2.0 * sample5 + sample8;\n"
+            + "    vec3 gy = -sample0 - 2.0 * sample1 - sample2 + sample6 + 2.0 * sample7 + sample8;\n"
+            + "    return sqrt(gx * gx + gy * gy);\n"
+            + "}\n"
+
+            // Grayscale
+            + "vec3 applyGrayscale(vec3 color) {\n"
+            + "    float gray = dot(color, vec3(0.299, 0.587, 0.114));\n"
+            + "    return vec3(gray);\n"
+            + "}\n"
+
+            // Thresholding
+            + "vec3 applyThreshold(vec3 color, float threshold) {\n"
+            + "    float gray = dot(color, vec3(0.299, 0.587, 0.114));\n"
+            + "    return gray > threshold ? vec3(1.0) : vec3(0.0);\n"
+            + "}\n"
+
+            // Gaussian Blur
+            + "vec3 applyGaussianBlur(samplerExternalOES tex, vec2 uv) {\n"
+            + "    float offset = 1.0 / 512.0;\n"
+            + "    vec3 color = texture2D(tex, uv).rgb * 0.36;\n"
+            + "    color += texture2D(tex, uv + vec2(offset, 0.0)).rgb * 0.12;\n"
+            + "    color += texture2D(tex, uv + vec2(-offset, 0.0)).rgb * 0.12;\n"
+            + "    color += texture2D(tex, uv + vec2(0.0, offset)).rgb * 0.12;\n"
+            + "    color += texture2D(tex, uv + vec2(0.0, -offset)).rgb * 0.12;\n"
+            + "    return color;\n"
+            + "}\n"
+
+            // Main Function
             + "void main() {\n"
-            + "  gl_FragColor = texture2D(sTexture,texCoord);\n" + "}";
+            + "    vec4 color = texture2D(sTexture, texCoord);\n"
+            + "    if (mode == 1) {\n"
+            + "        gl_FragColor = vec4(applyGrayscale(color.rgb), color.a);\n"
+            + "    } else if (mode == 2) {\n"
+            + "        gl_FragColor = vec4(applySobel(sTexture, texCoord), color.a);\n"
+            + "    } else if (mode == 3) {\n"
+            + "        gl_FragColor = vec4(applyThreshold(color.rgb, 0.5), color.a);\n"
+            + "    } else if (mode == 4) {\n"
+            + "        gl_FragColor = vec4(applyGaussianBlur(sTexture, texCoord), color.a);\n"
+            + "    } else {\n"
+            + "        gl_FragColor = color;\n"
+            + "    }\n"
+            + "}";
+
+
 
     private final String fssTex2Screen = ""
             + "precision mediump float;\n"
@@ -175,7 +234,7 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         surfaceTexture.updateTexImage();
-        float matrix[] = new float[16];
+        float[] matrix = new float[16];
         surfaceTexture.getTransformMatrix(matrix);
 
         // camTextureId->fboTexureId
@@ -183,6 +242,8 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         GLES20.glViewport(0, 0, textureWidth, textureHeight);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
         GLES20.glUseProgram(progCam2FBO);
+        int modeLocation = GLES20.glGetUniformLocation(progCam2FBO, "mode");
+        GLES20.glUniform1i(modeLocation, processingMode);
         GLES20.glVertexAttribPointer(vcCam2FBO, 2, GLES20.GL_FLOAT, false, 4 * 2, vertexCoordsBuffer);
         textureCoordsBuffer.clear();
         textureCoordsBuffer.put(transformTextureCoordinates(textureCoords, matrix));
@@ -269,6 +330,11 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         selectedCameraId = (selectedCameraId + 1) % numberOfCameras;
         openCamera();
     }
+    public void setProcessingMode(int mode) {
+        this.processingMode = mode;
+        requestRender(); // Request a frame update with the new mode
+    }
+
 
     public void openCamera() {
         if (disableCamera) return;

@@ -4,15 +4,11 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
-import android.util.Pair;
-import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ImageButton;
@@ -25,16 +21,15 @@ import com.baidu.paddle.lite.demo.common.Utils;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.List;
+import java.util.Locale;
 
 
-public class MainActivity extends Activity implements View.OnClickListener, CameraSurfaceView.OnTextureChangedListener {
-    private static final String TAG = MainActivity.class.getSimpleName();
-
+public class MainActivity extends Activity implements CameraSurfaceView.OnTextureChangedListener {
     CameraSurfaceView svPreview;
     TextView tvStatus;
     ImageButton btnSwitch;
     ImageButton btnShutter;
+    ImageButton btnFilter;
 
     String savedImagePath = "images/save.jpg";
     int lastFrameIndex = 0;
@@ -51,6 +46,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
 
 
     Native predictor = new Native();
+    private int processingMode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,29 +58,15 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
 
         setContentView(R.layout.activity_main);
 
-
         // Init the camera preview and UI components
         initView();
+
+        // Set Processing Mode after initializing svPreview
+        svPreview.setProcessingMode(2); // Edge Detection
 
         // Check and request CAMERA and WRITE_EXTERNAL_STORAGE permissions
         if (!checkAllPermissions()) {
             requestAllPermissions();
-        }
-    }
-
-    @Override
-    public void onClick(View v) {
-        switch (v.getId()) {
-            case R.id.btn_switch:
-                svPreview.switchCamera();
-                break;
-            case R.id.btn_shutter:
-                SimpleDateFormat date = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss");
-                synchronized (this) {
-                    savedImagePath = Utils.getDCIMDirectory() + File.separator + date.format(new Date()).toString() + ".png";
-                }
-                Toast.makeText(MainActivity.this, "Save snapshot to " + savedImagePath, Toast.LENGTH_SHORT).show();
-                break;
         }
     }
 
@@ -104,10 +86,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
         lastFrameIndex++;
         if (lastFrameIndex >= 30) {
             final int fps = (int) (lastFrameIndex * 1e9 / (System.nanoTime() - lastFrameTime));
-            runOnUiThread(new Runnable() {
-                public void run() {
-                    tvStatus.setText(Integer.toString(fps) + "fps");
-                }
+            runOnUiThread(() -> {
+                String fpsStr = fps + "fps";
+                tvStatus.setText(fpsStr);
             });
             lastFrameIndex = 0;
             lastFrameTime = System.nanoTime();
@@ -115,44 +96,34 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
         return modified;
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // Reload settings and re-initialize the predictor
-        checkRun();
-        // Open camera until the permissions have been granted
-        if (!checkAllPermissions()) {
-            svPreview.disableCamera();
-        }
-        svPreview.onResume();
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        svPreview.onPause();
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (predictor != null) {
-            predictor.release();
-        }
-        super.onDestroy();
-    }
-
     public void initView() {
-        svPreview = (CameraSurfaceView) findViewById(R.id.sv_preview);
+        svPreview = findViewById(R.id.svPreview);
         svPreview.setOnTextureChangedListener(this);
-        tvStatus = (TextView) findViewById(R.id.tv_status);
-        btnSwitch = (ImageButton) findViewById(R.id.btn_switch);
-        btnSwitch.setOnClickListener(this);
-        btnShutter = (ImageButton) findViewById(R.id.btn_shutter);
-        btnShutter.setOnClickListener(this);
+        tvStatus = findViewById(R.id.tvStatus);
+        btnSwitch = findViewById(R.id.btnSwitch);
+        btnSwitch.setOnClickListener(view -> svPreview.switchCamera());
+        btnShutter = findViewById(R.id.btnShutter);
+        btnFilter = findViewById(R.id.btnFilter);
+        btnShutter.setOnClickListener(view -> {
+            SimpleDateFormat date = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.getDefault());
+            synchronized (this) {
+                savedImagePath = Utils.getDCIMDirectory() + File.separator + date.format(new Date()) + ".png";
+            }
+            Toast.makeText(MainActivity.this, "Save snapshot to " + savedImagePath, Toast.LENGTH_SHORT).show();
+        });
+
+        btnFilter.setOnClickListener(v -> {
+            processingMode = (processingMode + 1) % 5; // Cycle through 0-4 modes
+            svPreview.setProcessingMode(processingMode);
+            Toast.makeText(MainActivity.this, "Filter Mode: " + processingMode, Toast.LENGTH_SHORT).show();
+        });
+
+        svPreview.setProcessingMode(1); // Grayscale
     }
+
 
     public void checkRun() {
-            try {
+        try {
             Utils.copyAssets(this, labelPath);
             String labelRealDir = new File(
                     this.getExternalFilesDir(null),
@@ -178,19 +149,19 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
                     this.getExternalFilesDir(null),
                     recModelPath).getAbsolutePath();
 
-                predictor.init(
-                        this,
-                        detRealModelDir,
-                        clsRealModelDir,
-                        recRealModelDir,
-                        configRealDir,
-                        labelRealDir,
-                        cpuThreadNum,
-                        cpuPowerMode);
-            } catch (Throwable e) {
-                e.printStackTrace();
-            }
+            predictor.init(
+                    this,
+                    detRealModelDir,
+                    clsRealModelDir,
+                    recRealModelDir,
+                    configRealDir,
+                    labelRealDir,
+                    cpuThreadNum,
+                    cpuPowerMode);
+        } catch (Throwable e) {
+            e.printStackTrace();
         }
+    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
@@ -219,5 +190,31 @@ public class MainActivity extends Activity implements View.OnClickListener, Came
     private boolean checkAllPermissions() {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
                 && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Reload settings and re-initialize the predictor
+        checkRun();
+        // Open camera until the permissions have been granted
+        if (!checkAllPermissions()) {
+            svPreview.disableCamera();
+        }
+        svPreview.onResume();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        svPreview.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (predictor != null) {
+            predictor.release();
+        }
+        super.onDestroy();
     }
 }
