@@ -67,7 +67,7 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/apply_filter"
                 android:scaleType="fitXY"
-                android:src="@drawable/ic_filter"
+                android:src="@drawable/baseline_photo_filter_24"
                 android:tint="@color/colorText" />
 
             <!-- Shutter Button -->
