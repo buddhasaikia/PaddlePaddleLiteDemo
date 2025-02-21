@@ -12,6 +12,7 @@ import android.support.v4.content.ContextCompat;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ImageButton;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,6 +31,7 @@ public class MainActivity extends Activity implements CameraSurfaceView.OnTextur
     ImageButton btnSwitch;
     ImageButton btnShutter;
     ImageButton btnFilter;
+    SeekBar zoomSlider;
 
     String savedImagePath = "images/save.jpg";
     int lastFrameIndex = 0;
@@ -104,12 +106,29 @@ public class MainActivity extends Activity implements CameraSurfaceView.OnTextur
         btnSwitch.setOnClickListener(view -> svPreview.switchCamera());
         btnShutter = findViewById(R.id.btnShutter);
         btnFilter = findViewById(R.id.btnFilter);
+        zoomSlider = findViewById(R.id.zoomSlider);
+
+        // Setup zoom slider
+        zoomSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                float zoomLevel = progress / 100f;  // Convert to 0-1 range
+                svPreview.setZoom(zoomLevel);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
         btnShutter.setOnClickListener(view -> {
             SimpleDateFormat date = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.getDefault());
             synchronized (this) {
                 savedImagePath = Utils.getDCIMDirectory() + File.separator + date.format(new Date()) + ".png";
             }
-            Toast.makeText(MainActivity.this, "Save snapshot to " + savedImagePath, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Save snapshot to " + savedImagePath, Toast.LENGTH_SHORT).show();
         });
 
         btnFilter.setOnClickListener(v -> {

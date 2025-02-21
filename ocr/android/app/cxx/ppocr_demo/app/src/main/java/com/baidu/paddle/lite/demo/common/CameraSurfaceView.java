@@ -34,6 +34,10 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     public static final int EXPECTED_PREVIEW_WIDTH = 1280;
     public static final int EXPECTED_PREVIEW_HEIGHT = 720;
 
+    // Zoom related fields
+    private float currentZoom = 0f;
+    private float maxZoom = 0f;
+    private boolean isZoomSupported = false;
 
     protected int numberOfCameras;
     protected int selectedCameraId;
@@ -339,10 +343,20 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     public void openCamera() {
         if (disableCamera) return;
         camera = Camera.open(selectedCameraId);
+
+        // Check for zoom support
+        Camera.Parameters parameters = camera.getParameters();
+        if (parameters.isZoomSupported()) {
+            isZoomSupported = true;
+            maxZoom = parameters.getMaxZoom();
+            // Reset zoom to initial state
+            currentZoom = 0f;
+            updateCameraZoom();
+        }
+
         List<Size> supportedPreviewSizes = camera.getParameters().getSupportedPreviewSizes();
         Size previewSize = Utils.getOptimalPreviewSize(supportedPreviewSizes, EXPECTED_PREVIEW_WIDTH,
                 EXPECTED_PREVIEW_HEIGHT);
-        Camera.Parameters parameters = camera.getParameters();
         parameters.setPreviewSize(previewSize.width, previewSize.height);
         if (parameters.getSupportedFocusModes().contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
             parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
@@ -387,6 +401,42 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
             Log.e(TAG, "IOException caused by setPreviewDisplay()", exception);
         }
         camera.startPreview();
+    }
+
+    // Add new methods for zoom control
+    public void setZoom(float zoomLevel) {
+        if (!isZoomSupported || camera == null) return;
+
+        // Ensure zoom level is between 0 and 1
+        currentZoom = Math.max(0f, Math.min(1f, zoomLevel));
+        updateCameraZoom();
+    }
+
+    public float getCurrentZoom() {
+        return currentZoom;
+    }
+
+    public boolean isZoomSupported() {
+        return isZoomSupported;
+    }
+
+    public float getMaxZoom() {
+        return maxZoom;
+    }
+
+    private void updateCameraZoom() {
+        if (!isZoomSupported || camera == null) return;
+
+        Camera.Parameters parameters = camera.getParameters();
+        // Convert the normalized zoom value (0-1) to camera zoom value (0-maxZoom)
+        int zoomValue = (int) (currentZoom * maxZoom);
+        parameters.setZoom(zoomValue);
+
+        try {
+            camera.setParameters(parameters);
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Error setting zoom: " + e.getMessage());
+        }
     }
 
     public void releaseCamera() {
