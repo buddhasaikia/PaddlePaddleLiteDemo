@@ -63,8 +63,10 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
 
     private final String vss = ""
             + "attribute vec2 vPosition;\n"
-            + "attribute vec2 vTexCoord;\n" + "varying vec2 texCoord;\n"
-            + "void main() {\n" + "  texCoord = vTexCoord;\n"
+            + "attribute vec2 vTexCoord;\n"
+            + "varying vec2 texCoord;\n"
+            + "void main() {\n"
+            + "  texCoord = vTexCoord;\n"
             + "  gl_Position = vec4 (vPosition.x, vPosition.y, 0.0, 1.0);\n"
             + "}";
 
@@ -138,14 +140,15 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
             + "uniform sampler2D sTexture;\n"
             + "varying vec2 texCoord;\n"
             + "void main() {\n"
-            + "  gl_FragColor = texture2D(sTexture,texCoord);\n" + "}";
+            + "  gl_FragColor = texture2D(sTexture,texCoord);\n"
+            + "}";
 
-    private final float vertexCoords[] = {
+    private final float[] vertexCoords = {
             -1, -1,
             -1, 1,
             1, -1,
             1, 1};
-    private float textureCoords[] = {
+    private final float[] textureCoords = {
             0, 1,
             0, 0,
             1, 1,
@@ -163,7 +166,7 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     private int scanCount = 0;
 
     public interface OnTextureChangedListener {
-        public RecTextResult onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight);
+        RecTextResult onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight);
     }
 
     private OnTextureChangedListener onTextureChangedListener = null;
