@@ -77,7 +77,7 @@ tasks.register('downloadAndExtractArchives', DefaultTask) {
             boolean copyFiles = !file("${archive.dest}").exists()
             if (!file("${cachePath}/${cacheName}.tar.gz").exists()) {
                 ant.get(src: archive.src, dest: file("${cachePath}/${cacheName}.tar.gz"))
-                copyFiles = true; // force to copy files from the latest archive files
+                copyFiles = true // force to copy files from the latest archive files
             }
             // Extract the target archive if its dest path does not exists
             if (copyFiles) {

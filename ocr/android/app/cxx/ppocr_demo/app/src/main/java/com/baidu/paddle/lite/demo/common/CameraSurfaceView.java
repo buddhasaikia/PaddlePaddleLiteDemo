@@ -1,6 +1,8 @@
 package com.baidu.paddle.lite.demo.common;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.hardware.Camera.CameraInfo;
@@ -34,6 +36,12 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     public static final int EXPECTED_PREVIEW_WIDTH = 1280;
     public static final int EXPECTED_PREVIEW_HEIGHT = 720;
 
+    private float rectLeft = 0.2f;
+    private float rectRight = 0.8f;
+    private float rectTop = 0.2f;
+    private float rectBottom = 0.8f;
+    private int rectangleColor = Color.GREEN;
+    private final float rectangleBorderWidth = 0.01f;
 
     protected int numberOfCameras;
     protected int selectedCameraId;
@@ -55,34 +63,55 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     protected int[] fboTexureId = {0};
     protected int[] drawTexureId = {0};
 
-    private final String vss = ""
-            + "attribute vec2 vPosition;\n"
-            + "attribute vec2 vTexCoord;\n" + "varying vec2 texCoord;\n"
-            + "void main() {\n" + "  texCoord = vTexCoord;\n"
+    private final String vss = "attribute vec2 vPosition;\n"
+            + "attribute vec2 vTexCoord;\n"
+            + "varying vec2 texCoord;\n"
+            + "void main() {\n"
+            + "  texCoord = vTexCoord;\n"
             + "  gl_Position = vec4 (vPosition.x, vPosition.y, 0.0, 1.0);\n"
             + "}";
 
-    private final String fssCam2FBO = ""
-            + "#extension GL_OES_EGL_image_external : require\n"
+    private final String fssCam2FBO = "#extension GL_OES_EGL_image_external : require\n"
             + "precision mediump float;\n"
             + "uniform samplerExternalOES sTexture;\n"
             + "varying vec2 texCoord;\n"
+            + "uniform vec4 uRect;\n"  // Add rectangle bounds
             + "void main() {\n"
-            + "  gl_FragColor = texture2D(sTexture,texCoord);\n" + "}";
+            + "  if (texCoord.x >= uRect.x && texCoord.x <= uRect.y && \n"
+            + "      texCoord.y >= uRect.z && texCoord.y <= uRect.w) {\n"
+            + "    gl_FragColor = texture2D(sTexture,texCoord);\n"
+            + "  } else {\n"
+            + "    gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);\n"
+            + "  }\n"
+            + "}";
 
-    private final String fssTex2Screen = ""
-            + "precision mediump float;\n"
+    private final String fssTex2Screen = "precision mediump float;\n"
             + "uniform sampler2D sTexture;\n"
             + "varying vec2 texCoord;\n"
             + "void main() {\n"
-            + "  gl_FragColor = texture2D(sTexture,texCoord);\n" + "}";
+            + "  gl_FragColor = texture2D(sTexture,texCoord);\n"
+            + "}";
 
-    private final float vertexCoords[] = {
+    // New shader for rectangle overlay
+    private final String vssOverlay = "attribute vec2 vPosition;\n"
+            + "void main() {\n"
+            + "  gl_Position = vec4(vPosition.x, vPosition.y, 0.0, 1.0);\n"
+            + "}";
+
+    private final String fssOverlay = "precision mediump float;\n"
+            + "uniform vec4 uColor;\n"
+            + "void main() {\n"
+            + "  gl_FragColor = uColor;\n"
+            + "}";
+
+
+
+    private final float[] vertexCoords = {
             -1, -1,
             -1, 1,
             1, -1,
             1, 1};
-    private float textureCoords[] = {
+    private final float[] textureCoords = {
             0, 1,
             0, 0,
             1, 1,
@@ -90,17 +119,22 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
 
     private FloatBuffer vertexCoordsBuffer;
     private FloatBuffer textureCoordsBuffer;
+    private FloatBuffer rectangleVerticesBuffer;
 
     private int progCam2FBO = -1;
     private int progTex2Screen = -1;
+    private int progRectangle = -1;
     private int vcCam2FBO;
     private int tcCam2FBO;
     private int vcTex2Screen;
     private int tcTex2Screen;
+    private int vcRectangle;
+    private int colorUniformLocation;
+    private int rectUniformLocation;
     private int scanCount = 0;
 
     public interface OnTextureChangedListener {
-        public RecTextResult onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight);
+        RecTextResult onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight);
     }
 
     private OnTextureChangedListener onTextureChangedListener = null;
@@ -151,12 +185,38 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         progCam2FBO = Utils.createShaderProgram(vss, fssCam2FBO);
         vcCam2FBO = GLES20.glGetAttribLocation(progCam2FBO, "vPosition");
         tcCam2FBO = GLES20.glGetAttribLocation(progCam2FBO, "vTexCoord");
+        rectUniformLocation = GLES20.glGetUniformLocation(progCam2FBO, "uRect");
         GLES20.glEnableVertexAttribArray(vcCam2FBO);
         GLES20.glEnableVertexAttribArray(tcCam2FBO);
         // fboTexureId/drawTexureId -> screen
         progTex2Screen = Utils.createShaderProgram(vss, fssTex2Screen);
         vcTex2Screen = GLES20.glGetAttribLocation(progTex2Screen, "vPosition");
         tcTex2Screen = GLES20.glGetAttribLocation(progTex2Screen, "vTexCoord");
+
+        // Setup rectangle program
+        progRectangle = Utils.createShaderProgram(vssOverlay, fssOverlay);
+        vcRectangle = GLES20.glGetAttribLocation(progRectangle, "vPosition");
+        colorUniformLocation = GLES20.glGetUniformLocation(progRectangle, "uColor");
+
+        // Prepare rectangle vertices buffer
+        float[] rectangleVertices = {
+                rectLeft * 2 - 1, rectTop * 2 - 1,
+                rectLeft * 2 - 1, rectBottom * 2 - 1,
+                rectRight * 2 - 1, rectTop * 2 - 1,
+                rectRight * 2 - 1, rectBottom * 2 - 1,
+                rectLeft * 2 - 1, rectTop * 2 - 1,
+                rectRight * 2 - 1, rectTop * 2 - 1,
+                rectLeft * 2 - 1, rectBottom * 2 - 1,
+                rectRight * 2 - 1, rectBottom * 2 - 1
+        };
+
+        rectangleVerticesBuffer = ByteBuffer.allocateDirect(rectangleVertices.length * 4)
+                .order(ByteOrder.nativeOrder())
+                .asFloatBuffer();
+        rectangleVerticesBuffer.put(rectangleVertices).position(0);
+
+        GLES20.glEnableVertexAttribArray(vcCam2FBO);
+        GLES20.glEnableVertexAttribArray(tcCam2FBO);
         GLES20.glEnableVertexAttribArray(vcTex2Screen);
         GLES20.glEnableVertexAttribArray(tcTex2Screen);
     }
@@ -175,14 +235,19 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         surfaceTexture.updateTexImage();
-        float matrix[] = new float[16];
+        float[] matrix = new float[16];
         surfaceTexture.getTransformMatrix(matrix);
 
+        // Draw to FBO with rectangle cropping
         // camTextureId->fboTexureId
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo[0]);
         GLES20.glViewport(0, 0, textureWidth, textureHeight);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
         GLES20.glUseProgram(progCam2FBO);
+
+        // Set rectangle bounds
+        GLES20.glUniform4f(rectUniformLocation, rectLeft, rectRight, rectTop, rectBottom);
+
         GLES20.glVertexAttribPointer(vcCam2FBO, 2, GLES20.GL_FLOAT, false, 4 * 2, vertexCoordsBuffer);
         textureCoordsBuffer.clear();
         textureCoordsBuffer.put(transformTextureCoordinates(textureCoords, matrix));
@@ -230,6 +295,54 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         GLES20.glUniform1i(GLES20.glGetUniformLocation(progTex2Screen, "sTexture"), 0);
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
         GLES20.glFlush();
+
+        // Draw rectangle overlay
+        GLES20.glUseProgram(progRectangle);
+        GLES20.glLineWidth(5.0f);
+
+        float[] color = {
+                Color.red(rectangleColor) / 255.0f,
+                Color.green(rectangleColor) / 255.0f,
+                Color.blue(rectangleColor) / 255.0f,
+                Color.alpha(rectangleColor) / 255.0f
+        };
+
+        GLES20.glUniform4fv(colorUniformLocation, 1, color, 0);
+        GLES20.glVertexAttribPointer(vcRectangle, 2, GLES20.GL_FLOAT, false, 0, rectangleVerticesBuffer);
+        GLES20.glEnableVertexAttribArray(vcRectangle);
+        GLES20.glDrawArrays(GLES20.GL_LINES, 0, 8);
+    }
+
+    // New methods for rectangle control
+    public void setRectangleBounds(float left, float top, float right, float bottom) {
+        rectLeft = left;
+        rectRight = right;
+        rectTop = top;
+        rectBottom = bottom;
+
+        float[] rectangleVertices = {
+                rectLeft * 2 - 1, rectTop * 2 - 1,
+                rectLeft * 2 - 1, rectBottom * 2 - 1,
+                rectRight * 2 - 1, rectTop * 2 - 1,
+                rectRight * 2 - 1, rectBottom * 2 - 1,
+                rectLeft * 2 - 1, rectTop * 2 - 1,
+                rectRight * 2 - 1, rectTop * 2 - 1,
+                rectLeft * 2 - 1, rectBottom * 2 - 1,
+                rectRight * 2 - 1, rectBottom * 2 - 1
+        };
+
+        rectangleVerticesBuffer.clear();
+        rectangleVerticesBuffer.put(rectangleVertices).position(0);
+        requestRender();
+    }
+
+    public void setRectangleColor(int color) {
+        rectangleColor = color;
+        requestRender();
+    }
+
+    public RectF getRectangleBounds() {
+        return new RectF(rectLeft, rectTop, rectRight, rectBottom);
     }
 
     private float[] transformTextureCoordinates(float[] coords, float[] matrix) {
@@ -281,6 +394,9 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         if (parameters.getSupportedFocusModes().contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
             parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
         }
+        int maxZoom = parameters.getMaxZoom();
+        System.out.println("buddha maxZoom: " + maxZoom);
+        parameters.setZoom(maxZoom / 2);
         camera.setParameters(parameters);
         int degree = Utils.getCameraDisplayOrientation(context, selectedCameraId);
         camera.setDisplayOrientation(degree);
