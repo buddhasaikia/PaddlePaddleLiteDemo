@@ -32,5 +32,8 @@
     <string name="FKP_CPU_POWER_MODE_DEFAULT">LITE_POWER_HIGH</string>
     <string name="FKP_INPUT_WIDTH_DEFAULT">60</string>
     <string name="FKP_INPUT_HEIGHT_DEFAULT">60</string>
+    <string name="switch_camera">Switch Camera</string>
+    <string name="apply_filter">Apply Filter</string>
+    <string name="capture_photo">Capture Photo</string>
 </resources>
 

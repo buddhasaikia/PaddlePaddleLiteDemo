@@ -34,6 +34,10 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     public static final int EXPECTED_PREVIEW_WIDTH = 1280;
     public static final int EXPECTED_PREVIEW_HEIGHT = 720;
 
+    // Zoom related fields
+    private float currentZoom = 0f;
+    private float maxZoom = 0f;
+    private boolean isZoomSupported = false;
 
     protected int numberOfCameras;
     protected int selectedCameraId;
@@ -47,6 +51,8 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     protected int textureWidth = 0;
     protected int textureHeight = 0;
 
+    private int processingMode = 0; // Default: Normal (0 = Normal, 1 = Grayscale, 2 = Edge, 3 = Threshold, 4 = Blur)
+
     // In order to manipulate the camera preview data and render the modified one
     // to the screen, three textures are created and the data flow is shown as following:
     // previewdata->camTextureId->fboTexureId->drawTexureId->framebuffer
@@ -57,8 +63,10 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
 
     private final String vss = ""
             + "attribute vec2 vPosition;\n"
-            + "attribute vec2 vTexCoord;\n" + "varying vec2 texCoord;\n"
-            + "void main() {\n" + "  texCoord = vTexCoord;\n"
+            + "attribute vec2 vTexCoord;\n"
+            + "varying vec2 texCoord;\n"
+            + "void main() {\n"
+            + "  texCoord = vTexCoord;\n"
             + "  gl_Position = vec4 (vPosition.x, vPosition.y, 0.0, 1.0);\n"
             + "}";
 
@@ -67,22 +75,80 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
             + "precision mediump float;\n"
             + "uniform samplerExternalOES sTexture;\n"
             + "varying vec2 texCoord;\n"
+            + "uniform int mode;\n"  // Mode selector
+
+            // Edge Detection (Sobel)
+            + "vec3 applySobel(samplerExternalOES tex, vec2 uv) {\n"
+            + "    float offset = 1.0 / 512.0;\n"
+            + "    float gray0 = dot(texture2D(tex, uv + vec2(-offset, -offset)).rgb, vec3(0.299, 0.587, 0.114));\n"
+            + "    float gray1 = dot(texture2D(tex, uv + vec2( 0.0, -offset)).rgb, vec3(0.299, 0.587, 0.114));\n"
+            + "    float gray2 = dot(texture2D(tex, uv + vec2( offset, -offset)).rgb, vec3(0.299, 0.587, 0.114));\n"
+            + "    float gray3 = dot(texture2D(tex, uv + vec2(-offset,  0.0)).rgb, vec3(0.299, 0.587, 0.114));\n"
+            + "    float gray5 = dot(texture2D(tex, uv + vec2( offset,  0.0)).rgb, vec3(0.299, 0.587, 0.114));\n"
+            + "    float gray6 = dot(texture2D(tex, uv + vec2(-offset,  offset)).rgb, vec3(0.299, 0.587, 0.114));\n"
+            + "    float gray7 = dot(texture2D(tex, uv + vec2( 0.0,  offset)).rgb, vec3(0.299, 0.587, 0.114));\n"
+            + "    float gray8 = dot(texture2D(tex, uv + vec2( offset,  offset)).rgb, vec3(0.299, 0.587, 0.114));\n"
+            + "    float gx = -gray0 - 2.0 * gray3 - gray6 + gray2 + 2.0 * gray5 + gray8;\n"
+            + "    float gy = -gray0 - 2.0 * gray1 - gray2 + gray6 + 2.0 * gray7 + gray8;\n"
+            + "    float edge = length(vec2(gx, gy));\n"
+            + "    return vec3(edge);\n"
+            + "}\n"
+
+            // Grayscale
+            + "vec3 applyGrayscale(vec3 color) {\n"
+            + "    float gray = dot(color, vec3(0.299, 0.587, 0.114));\n"
+            + "    return vec3(gray);\n"
+            + "}\n"
+
+            // Thresholding
+            + "vec3 applyThreshold(vec3 color, float threshold) {\n"
+            + "    float gray = dot(color, vec3(0.299, 0.587, 0.114));\n"
+            + "    return gray > threshold ? vec3(1.0) : vec3(0.0);\n"
+            + "}\n"
+
+            // Gaussian Blur
+            + "vec3 applyGaussianBlur(samplerExternalOES tex, vec2 uv) {\n"
+            + "    float offset = 1.0 / 512.0;\n"
+            + "    vec3 color = texture2D(tex, uv).rgb * 0.36;\n"
+            + "    color += texture2D(tex, uv + vec2(offset, 0.0)).rgb * 0.12;\n"
+            + "    color += texture2D(tex, uv + vec2(-offset, 0.0)).rgb * 0.12;\n"
+            + "    color += texture2D(tex, uv + vec2(0.0, offset)).rgb * 0.12;\n"
+            + "    color += texture2D(tex, uv + vec2(0.0, -offset)).rgb * 0.12;\n"
+            + "    return color;\n"
+            + "}\n"
+
+            // Main Function
             + "void main() {\n"
-            + "  gl_FragColor = texture2D(sTexture,texCoord);\n" + "}";
+            + "    vec4 color = texture2D(sTexture, texCoord);\n"
+            + "    if (mode == 1) {\n"
+            + "        gl_FragColor = vec4(applyGrayscale(color.rgb), color.a);\n"
+            + "    } else if (mode == 2) {\n"
+            + "        gl_FragColor = vec4(applySobel(sTexture, texCoord), color.a);\n"
+            + "    } else if (mode == 3) {\n"
+            + "        gl_FragColor = vec4(applyThreshold(color.rgb, 0.5), color.a);\n"
+            + "    } else if (mode == 4) {\n"
+            + "        gl_FragColor = vec4(applyGaussianBlur(sTexture, texCoord), color.a);\n"
+            + "    } else {\n"
+            + "        gl_FragColor = color;\n"
+            + "    }\n"
+            + "}";
+
+
 
     private final String fssTex2Screen = ""
             + "precision mediump float;\n"
             + "uniform sampler2D sTexture;\n"
             + "varying vec2 texCoord;\n"
             + "void main() {\n"
-            + "  gl_FragColor = texture2D(sTexture,texCoord);\n" + "}";
+            + "  gl_FragColor = texture2D(sTexture,texCoord);\n"
+            + "}";
 
-    private final float vertexCoords[] = {
+    private final float[] vertexCoords = {
             -1, -1,
             -1, 1,
             1, -1,
             1, 1};
-    private float textureCoords[] = {
+    private final float[] textureCoords = {
             0, 1,
             0, 0,
             1, 1,
@@ -100,7 +166,7 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
     private int scanCount = 0;
 
     public interface OnTextureChangedListener {
-        public RecTextResult onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight);
+        RecTextResult onTextureChanged(int inTextureId, int outTextureId, int textureWidth, int textureHeight);
     }
 
     private OnTextureChangedListener onTextureChangedListener = null;
@@ -175,7 +241,7 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         surfaceTexture.updateTexImage();
-        float matrix[] = new float[16];
+        float[] matrix = new float[16];
         surfaceTexture.getTransformMatrix(matrix);
 
         // camTextureId->fboTexureId
@@ -183,6 +249,8 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         GLES20.glViewport(0, 0, textureWidth, textureHeight);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
         GLES20.glUseProgram(progCam2FBO);
+        int modeLocation = GLES20.glGetUniformLocation(progCam2FBO, "mode");
+        GLES20.glUniform1i(modeLocation, processingMode);
         GLES20.glVertexAttribPointer(vcCam2FBO, 2, GLES20.GL_FLOAT, false, 4 * 2, vertexCoordsBuffer);
         textureCoordsBuffer.clear();
         textureCoordsBuffer.put(transformTextureCoordinates(textureCoords, matrix));
@@ -269,14 +337,29 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
         selectedCameraId = (selectedCameraId + 1) % numberOfCameras;
         openCamera();
     }
+    public void setProcessingMode(int mode) {
+        this.processingMode = mode;
+        requestRender(); // Request a frame update with the new mode
+    }
+
 
     public void openCamera() {
         if (disableCamera) return;
         camera = Camera.open(selectedCameraId);
+
+        // Check for zoom support
+        Camera.Parameters parameters = camera.getParameters();
+        if (parameters.isZoomSupported()) {
+            isZoomSupported = true;
+            maxZoom = parameters.getMaxZoom();
+            // Reset zoom to initial state
+            currentZoom = 0f;
+            updateCameraZoom();
+        }
+
         List<Size> supportedPreviewSizes = camera.getParameters().getSupportedPreviewSizes();
         Size previewSize = Utils.getOptimalPreviewSize(supportedPreviewSizes, EXPECTED_PREVIEW_WIDTH,
                 EXPECTED_PREVIEW_HEIGHT);
-        Camera.Parameters parameters = camera.getParameters();
         parameters.setPreviewSize(previewSize.width, previewSize.height);
         if (parameters.getSupportedFocusModes().contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
             parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
@@ -321,6 +404,42 @@ public class CameraSurfaceView extends GLSurfaceView implements Renderer,
             Log.e(TAG, "IOException caused by setPreviewDisplay()", exception);
         }
         camera.startPreview();
+    }
+
+    // Add new methods for zoom control
+    public void setZoom(float zoomLevel) {
+        if (!isZoomSupported || camera == null) return;
+
+        // Ensure zoom level is between 0 and 1
+        currentZoom = Math.max(0f, Math.min(1f, zoomLevel));
+        updateCameraZoom();
+    }
+
+    public float getCurrentZoom() {
+        return currentZoom;
+    }
+
+    public boolean isZoomSupported() {
+        return isZoomSupported;
+    }
+
+    public float getMaxZoom() {
+        return maxZoom;
+    }
+
+    private void updateCameraZoom() {
+        if (!isZoomSupported || camera == null) return;
+
+        Camera.Parameters parameters = camera.getParameters();
+        // Convert the normalized zoom value (0-1) to camera zoom value (0-maxZoom)
+        int zoomValue = (int) (currentZoom * maxZoom);
+        parameters.setZoom(zoomValue);
+
+        try {
+            camera.setParameters(parameters);
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Error setting zoom: " + e.getMessage());
+        }
     }
 
     public void releaseCamera() {
